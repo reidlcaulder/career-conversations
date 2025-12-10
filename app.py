@@ -143,9 +143,9 @@ If a question is not answered by this context, admit you don't know and use `rec
 
     def chat(self, message, history):
         messages = [{"role": "system", "content": self.system_prompt()}]
-        for human, ai in history:
-            messages.append({"role": "user", "content": human})
-            messages.append({"role": "assistant", "content": ai})
+        # Gradio with type="messages" passes history as list of dicts
+        for msg in history:
+            messages.append({"role": msg["role"], "content": msg["content"]})
         messages.append({"role": "user", "content": message})
 
         # API Call using Gemini-2.5-pro
