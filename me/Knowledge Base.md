@@ -9,10 +9,20 @@
 * **Accounting Philosophy:** Firmly subscribes to the belief that accounting is the "language of business." To be a successful investor, one cannot simply rely on surface-level metrics; one must fundamentally understand accounting to the point where it is second nature. It must be "ingrained," allowing for the intuitive reading of financial statements (10-Ks, 10-Qs) to reveal the true narrative of a company's performance, beyond what management highlights in earnings calls.  
 * **Multidisciplinary Approach:** Adopts the "Charlie Munger principle" of mental models, aspiring to be a polymath. This philosophy posits that problems are best solved not by looking through a single lens, but by applying concepts from various disciplines (e.g., psychology, history, economics). While currently focused heavily on the intersection of Finance and Artificial Intelligence, the long-term goal is to continuously broaden this "lattice of mental models" to identify investment opportunities others might miss.
 
-**Investment Philosophy & "Circle of Competence":**
+**Investment Philosophy:**
 
+**Circle of Competence:**
 * **Definition:** Strictly adheres to Warren Buffett’s concept of the "Circle of Competence." This discipline involves rigorously defining what one knows and, more importantly, what one does *not* know. Success in investing comes not from having an opinion on every stock, but from having a high-conviction, accurate view on the few businesses that fall within one's specific area of expertise.  
 * **Application:** Research is channeled exclusively into sectors and business models where the unit economics, competitive advantages, and risks are transparent and fully understood. This disciplined focus prevents unforced errors driven by "FOMO" (fear of missing out) in hyped but opaque sectors.
+**Durable Competitive Advantage (Economic "Moats"):**
+* **Definition:** Prioritizes the "castle and moat" theory—identifying businesses with structural defenses that protect high returns on capital over decades. This includes intangible assets (brands/patents), high switching costs, or network effects that insulate the company from competitors.
+* **Application:** Capital is allocated away from commodity businesses and toward "franchises" that possess pricing power—the ability to raise prices without losing market share—ensuring profitability even during inflationary periods.
+**Margin of Safety & Intrinsic Value:**
+* **Definition:** Grounded in the Benjamin Graham principle that "price is what you pay; value is what you get." Investments are only made when there is a significant gap (margin of safety) between the market price and the calculated intrinsic value of the business to buffer against analytical error.
+* **Application:** Avoids reliance on optimistic future growth projections to justify a purchase. Instead, the value must be evident in current free cash flow and tangible assets, treating the stock purchase as buying a dollar for fifty cents.
+**Long-Term Owner Orientation:**
+* **Definition:** Views stocks not as ticker symbols to be traded, but as proportional ownership interests in living businesses. The preferred holding period is "forever," allowing the mathematics of compounding to work uninterrupted by taxes or transaction costs.
+* **Application:** Ignores short-term market volatility and macro-forecasting. Decisions are driven by the operational performance of the business and the rationality of capital allocation, rather than the mood of "Mr. Market."
 
 **Technical Skills:**
 
