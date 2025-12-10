@@ -2,14 +2,17 @@ from dotenv import load_dotenv
 from openai import OpenAI
 import json
 import os
+import csv
+from datetime import datetime
 import requests
 from pypdf import PdfReader
 import gradio as gr
 
-
 load_dotenv(override=True)
 
+# --- Tool Definitions ---
 def push(text):
+    """Sends a notification to your phone via Pushover."""
     requests.post(
         "https://api.pushover.net/1/messages.json",
         data={
@@ -19,116 +22,178 @@ def push(text):
         }
     )
 
-
 def record_user_details(email, name="Name not provided", notes="not provided"):
-    push(f"Recording {name} with email {email} and notes {notes}")
-    return {"recorded": "ok"}
+    """Records recruiter/user contact info and notifies you immediately."""
+    push(f"🎯 LEAD: {name} ({email}) - {notes}")
+    return {"status": "User details recorded successfully"}
 
 def record_unknown_question(question):
-    push(f"Recording {question}")
-    return {"recorded": "ok"}
+    """Logs questions the agent couldn't answer so you can improve the Knowledge Base."""
+    # Send mobile notification
+    push(f"❓ UNKNOWN QUESTION: {question}")
+    
+    # Log to CSV file
+    csv_file = "unknown_questions.csv"
+    file_exists = os.path.exists(csv_file)
+    
+    with open(csv_file, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["timestamp", "question"])
+        writer.writerow([datetime.now().isoformat(), question])
+    
+    return {"status": "Question logged for review"}
 
-record_user_details_json = {
-    "name": "record_user_details",
-    "description": "Use this tool to record that a user is interested in being in touch and provided an email address",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "email": {
-                "type": "string",
-                "description": "The email address of this user"
-            },
-            "name": {
-                "type": "string",
-                "description": "The user's name, if they provided it"
+tools = [
+    {
+        "type": "function",
+        "function": {
+            "name": "record_user_details",
+            "description": "Use this tool to record that a user is interested in being in touch. ALWAYS ask for their email if the conversation is going well.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "email": {"type": "string", "description": "The email address of the user"},
+                    "name": {"type": "string", "description": "The user's name"},
+                    "notes": {"type": "string", "description": "Context about why they want to connect"}
+                },
+                "required": ["email"]
             }
-            ,
-            "notes": {
-                "type": "string",
-                "description": "Any additional information about the conversation that's worth recording to give context"
+        }
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "record_unknown_question",
+            "description": "Use this tool if the user asks a specific factual question about Reid that is NOT in your context. Do not make up facts.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "question": {"type": "string", "description": "The question you could not answer"}
+                },
+                "required": ["question"]
             }
-        },
-        "required": ["email"],
-        "additionalProperties": False
+        }
     }
-}
-
-record_unknown_question_json = {
-    "name": "record_unknown_question",
-    "description": "Always use this tool to record any question that couldn't be answered as you didn't know the answer",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "question": {
-                "type": "string",
-                "description": "The question that couldn't be answered"
-            },
-        },
-        "required": ["question"],
-        "additionalProperties": False
-    }
-}
-
-tools = [{"type": "function", "function": record_user_details_json},
-        {"type": "function", "function": record_unknown_question_json}]
-
+]
 
 class Me:
-
     def __init__(self):
-        self.openai = OpenAI()
+        # Using Gemini-2.5-pro via Google's OpenAI-compatible API
+        self.client = OpenAI(
+            api_key=os.getenv("GEMINI_API_KEY"),
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+        )
         self.name = "Reid Caulder"
+        
+        # Load LinkedIn (Resume Data)
         reader = PdfReader("me/linkedin.pdf")
         self.linkedin = ""
         for page in reader.pages:
             text = page.extract_text()
             if text:
                 self.linkedin += text
-        with open("me/summary.txt", "r", encoding="utf-8") as f:
-            self.summary = f.read()
+        
+        # Load Knowledge Base (Philosophy & Projects)
+        try:
+            with open("me/Knowledge Base.md", "r", encoding="utf-8") as f:
+                self.knowledge_base = f.read()
+        except FileNotFoundError:
+            self.knowledge_base = "Knowledge base file not found."
 
+    def system_prompt(self):
+        return f"""You are acting as {self.name}'s AI "Digital Twin." 
+You are answering questions on {self.name}'s portfolio website to potential employers, collaborators, and recruiters.
+
+**YOUR GOAL:**
+Represent {self.name} professionally, highlighting his unique dual-major background (Finance + Accounting) and his technical skills (Python, Agentic AI, Data Viz).
+Be engaging. If the user seems interested, try to get their email address using the `record_user_details` tool.
+
+**CONTEXT SOURCES:**
+1. **Knowledge Base (Philosophy & Deep Dives):** Use this for questions about his investment philosophy, specific projects (like the Equity Analyst Agent), and technical approach.
+2. **LinkedIn Profile:** Use this for dates, specific job titles, and education history.
+
+**DATA:**
+--- BEGIN KNOWLEDGE BASE ---
+{self.knowledge_base}
+--- END KNOWLEDGE BASE ---
+
+--- BEGIN LINKEDIN PROFILE ---
+{self.linkedin}
+--- END LINKEDIN PROFILE ---
+
+If a question is not answered by this context, admit you don't know and use `record_unknown_question`.
+"""
 
     def handle_tool_call(self, tool_calls):
         results = []
         for tool_call in tool_calls:
-            tool_name = tool_call.function.name
+            function_name = tool_call.function.name
             arguments = json.loads(tool_call.function.arguments)
-            print(f"Tool called: {tool_name}", flush=True)
-            tool = globals().get(tool_name)
-            result = tool(**arguments) if tool else {}
-            results.append({"role": "tool","content": json.dumps(result),"tool_call_id": tool_call.id})
+            
+            tool_func = globals().get(function_name)
+            if tool_func:
+                result = tool_func(**arguments)
+                results.append({
+                    "role": "tool",
+                    "tool_call_id": tool_call.id,
+                    "content": json.dumps(result)
+                })
         return results
-    
-    def system_prompt(self):
-        system_prompt = f"You are acting as {self.name}. You are answering questions on {self.name}'s website, \
-particularly questions related to {self.name}'s career, background, skills and experience. \
-Your responsibility is to represent {self.name} for interactions on the website as faithfully as possible. \
-You are given a summary of {self.name}'s background and LinkedIn profile which you can use to answer questions. \
-Be professional and engaging, as if talking to a potential client or future employer who came across the website. \
-If you don't know the answer to any question, use your record_unknown_question tool to record the question that you couldn't answer, even if it's about something trivial or unrelated to career. \
-If the user is engaging in discussion, try to steer them towards getting in touch via email; ask for their email and record it using your record_user_details tool. "
 
-        system_prompt += f"\n\n## Summary:\n{self.summary}\n\n## LinkedIn Profile:\n{self.linkedin}\n\n"
-        system_prompt += f"With this context, please chat with the user, always staying in character as {self.name}."
-        return system_prompt
-    
     def chat(self, message, history):
-        messages = [{"role": "system", "content": self.system_prompt()}] + history + [{"role": "user", "content": message}]
-        done = False
-        while not done:
-            response = self.openai.chat.completions.create(model="gpt-4o-mini", messages=messages, tools=tools)
-            if response.choices[0].finish_reason=="tool_calls":
-                message = response.choices[0].message
-                tool_calls = message.tool_calls
-                results = self.handle_tool_call(tool_calls)
-                messages.append(message)
-                messages.extend(results)
-            else:
-                done = True
-        return response.choices[0].message.content
-    
+        messages = [{"role": "system", "content": self.system_prompt()}]
+        for human, ai in history:
+            messages.append({"role": "user", "content": human})
+            messages.append({"role": "assistant", "content": ai})
+        messages.append({"role": "user", "content": message})
+
+        # API Call using Gemini-2.5-pro
+        response = self.client.chat.completions.create(
+            model="gemini-2.5-pro",
+            messages=messages,
+            tools=tools,
+            tool_choice="auto"
+        )
+        
+        msg = response.choices[0].message
+        
+        if msg.tool_calls:
+            messages.append(msg)
+            tool_results = self.handle_tool_call(msg.tool_calls)
+            messages.extend(tool_results)
+            
+            stream = self.client.chat.completions.create(
+                model="gemini-2.5-pro",
+                messages=messages,
+                stream=True
+            )
+            partial_message = ""
+            for chunk in stream:
+                if chunk.choices[0].delta.content:
+                    partial_message += chunk.choices[0].delta.content
+                    yield partial_message
+        else:
+            yield msg.content
 
 if __name__ == "__main__":
     me = Me()
-    gr.ChatInterface(me.chat, type="messages").launch()
+    
+    # Updated Examples per your request
+    examples = [
+        "Tell me about the Agentic AI projects you're working on.",
+        "What are your technical skills?",
+        "What is your investment philosophy?",
+        "Tell me about your time as an Audit Intern."
+    ]
+    
+    chat_interface = gr.ChatInterface(
+        fn=me.chat,
+        type="messages",
+        title="Reid Caulder's Digital Twin",
+        description="Ask me anything about Reid's projects, background, or the technical architecture of this agent!",
+        examples=examples,
+    )
+    
+    chat_interface.launch()
     
